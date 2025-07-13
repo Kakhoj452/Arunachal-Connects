@@ -1,0 +1,845 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Arunachal Connect</title>
+<style>
+  body {
+    font-family: Arial, sans-serif;
+    margin:0; padding:0;
+    background: #f0f2f5;
+  }
+  header {
+    background: #1877f2;
+    color: white;
+    padding: 15px;
+    font-size: 24px;
+    text-align: center;
+  }
+  #auth-section, #app-section {
+    max-width: 600px;
+    margin: 20px auto;
+    background: white;
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: 0 0 8px #ccc;
+  }
+  input, textarea, select, button {
+    width: 100%;
+    padding: 10px;
+    margin-top: 10px;
+    font-size: 16px;
+    border-radius: 5px;
+    border: 1px solid #ccc;
+    box-sizing: border-box;
+  }
+  button {
+    background: #1877f2;
+    color: white;
+    border: none;
+    cursor: pointer;
+  }
+  button:hover {
+    background: #145dbf;
+  }
+  .profile-photo {
+    width: 100px; height: 100px;
+    border-radius: 50%;
+    border: 2px solid #1877f2;
+    object-fit: cover;
+    display: block;
+    margin: 15px auto;
+  }
+  .flex-row {
+    display: flex;
+    gap: 10px;
+  }
+  .flex-row > * {
+    flex: 1;
+  }
+  .friends-list, .posts-list, .requests-list, .groups-list, .chat-box {
+    max-height: 200px;
+    overflow-y: auto;
+    border: 1px solid #ccc;
+    padding: 10px;
+    margin-top: 10px;
+    border-radius: 5px;
+    background: #fafafa;
+  }
+  .friend-item, .post-item, .request-item, .group-item, .chat-message {
+    margin-bottom: 10px;
+  }
+  .chat-messages {
+    max-height: 150px;
+    overflow-y: auto;
+    background: #e6e6e6;
+    padding: 10px;
+    border-radius: 5px;
+  }
+  .invite-buttons button {
+    width: 32%;
+    margin-right: 2%;
+    font-size: 14px;
+  }
+  #camera, #canvas {
+    display: none;
+    margin: 10px 0;
+    width: 100%;
+  }
+  #app-nav {
+    margin-bottom: 15px;
+  }
+  #app-nav button {
+    width: auto;
+    margin-right: 10px;
+    padding: 8px 15px;
+  }
+</style>
+</head>
+<body>
+
+<header>Arunachal Connect</header>
+
+<section id="auth-section">
+  <h2>Login or Sign Up</h2>
+  <input type="email" id="email" placeholder="Email" autocomplete="username" />
+  <input type="password" id="password" placeholder="Password" autocomplete="current-password" />
+  <div class="flex-row">
+    <button onclick="login()">Login</button>
+    <button onclick="signup()">Sign Up</button>
+  </div>
+</section>
+
+<section id="app-section" style="display:none;">
+  <div id="app-nav">
+    <span id="welcome-msg">Welcome</span>
+    <button onclick="logout()">Logout</button>
+  </div>
+
+  <h3>Profile</h3>
+  <img id="profile-photo" class="profile-photo" src="https://via.placeholder.com/100?text=Photo" alt="Profile Photo" />
+  <input type="file" id="photo-input" accept="image/*" onchange="uploadPhoto(event)" />
+  <button onclick="startCamera()">📷 Take Photo</button>
+  <video id="camera" autoplay></video>
+  <canvas id="canvas" width="320" height="240"></canvas>
+
+  <input type="text" id="profile-name" placeholder="Your name" onblur="saveProfileName()" />
+
+  <h3>Create Post</h3>
+  <textarea id="post-text" placeholder="What's on your mind?"></textarea>
+  <button onclick="addPost()">Post</button>
+
+  <h3>Posts</h3>
+  <div id="posts-list" class="posts-list"></div>
+
+  <h3>Friends</h3>
+  <div id="friends-list" class="friends-list"></div>
+
+  <h3>Friend Requests</h3>
+  <div id="requests-list" class="requests-list"></div>
+
+  <h3>Groups</h3>
+  <input type="text" id="new-group-name" placeholder="New group name" />
+  <button onclick="createGroup()">Create Group</button>
+  <div id="groups-list" class="groups-list"></div>
+
+  <h3>Chat</h3>
+  <select id="chat-target"></select>
+  <div class="chat-messages" id="chat-messages"></div>
+  <input type="text" id="chat-input" placeholder="Type a message..." />
+  <button onclick="sendMessage()">Send</button>
+
+  <h3>Invite Friends</h3>
+  <input type="text" value="https://kakhoj452.github.io/myfacebook/" id="invite-link" readonly />
+  <div class="invite-buttons">
+    <button onclick="copyInvite()">Copy Link</button>
+    <button onclick="inviteWhatsApp()">WhatsApp</button>
+    <button onclick="inviteSMS()">SMS</button>
+  </div>
+</section>
+
+<script type="module">
+// Firebase config and imports
+
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import {
+  getAuth,
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+  onAuthStateChanged,
+  signOut
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+
+import {
+  getFirestore,
+  doc,
+  getDoc,
+  setDoc,
+  updateDoc,
+  arrayUnion,
+  arrayRemove,
+  collection,
+  query,
+  where,
+  getDocs,
+  onSnapshot,
+  addDoc,
+  orderBy,
+  serverTimestamp,
+  Timestamp
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyA5A-DFo6MKDLT3T4mVBe-MJ6LRRTOTyK0",
+  authDomain: "arunachal-connect.firebaseapp.com",
+  projectId: "arunachal-connect",
+  storageBucket: "arunachal-connect.appspot.com",
+  messagingSenderId: "560048361030",
+  appId: "1:560048361030:web:91dc33e39a5919f069c447"
+};
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+
+const authSection = document.getElementById("auth-section");
+const appSection = document.getElementById("app-section");
+const welcomeMsg = document.getElementById("welcome-msg");
+
+const photoInput = document.getElementById("photo-input");
+const profilePhoto = document.getElementById("profile-photo");
+const profileNameInput = document.getElementById("profile-name");
+
+const postsList = document.getElementById("posts-list");
+const friendsList = document.getElementById("friends-list");
+const requestsList = document.getElementById("requests-list");
+const groupsList = document.getElementById("groups-list");
+
+const chatTargetSelect = document.getElementById("chat-target");
+const chatMessagesDiv = document.getElementById("chat-messages");
+const chatInput = document.getElementById("chat-input");
+
+const cameraVideo = document.getElementById("camera");
+const canvas = document.getElementById("canvas");
+
+let currentUser = null;
+let currentUserData = null;
+let cameraStream = null;
+let currentChatTarget = null;
+let unsubscribeChat = null;
+
+function clearElement(el) {
+  while (el.firstChild) el.removeChild(el.firstChild);
+}
+
+async function signup() {
+  const email = document.getElementById("email").value.trim();
+  const password = document.getElementById("password").value.trim();
+  if (!email || !password) {
+    alert("Please enter email and password.");
+    return;
+  }
+  try {
+    const userCred = await createUserWithEmailAndPassword(auth, email, password);
+    currentUser = userCred.user;
+    await initializeUserDoc(currentUser.email);
+    alert("Signup successful! You can now login.");
+  } catch (e) {
+    alert("Signup error: " + e.message);
+  }
+}
+
+async function login() {
+  const email = document.getElementById("email").value.trim();
+  const password = document.getElementById("password").value.trim();
+  if (!email || !password) {
+    alert("Please enter email and password.");
+    return;
+  }
+  try {
+    const userCred = await signInWithEmailAndPassword(auth, email, password);
+    currentUser = userCred.user;
+  } catch (e) {
+    alert("Login error: " + e.message);
+  }
+}
+
+function logout() {
+  if (unsubscribeChat) unsubscribeChat();
+  signOut(auth);
+  currentUser = null;
+  currentUserData = null;
+  clearElement(postsList);
+  clearElement(friendsList);
+  clearElement(requestsList);
+  clearElement(groupsList);
+  clearElement(chatMessagesDiv);
+  chatTargetSelect.innerHTML = "";
+  authSection.style.display = "block";
+  appSection.style.display = "none";
+  profilePhoto.src = "https://via.placeholder.com/100?text=Photo";
+  profileNameInput.value = "";
+  if (cameraStream) {
+    cameraStream.getTracks().forEach(track => track.stop());
+    cameraStream = null;
+  }
+}
+
+// When user logs in or out
+onAuthStateChanged(auth, async (user) => {
+  if (user) {
+    currentUser = user;
+    authSection.style.display = "none";
+    appSection.style.display = "block";
+    welcomeMsg.textContent = "Welcome, " + currentUser.email;
+    await loadUserData();
+    subscribeToChat();
+  } else {
+    currentUser = null;
+    currentUserData = null;
+    authSection.style.display = "block";
+    appSection.style.display = "none";
+  }
+});
+
+async function initializeUserDoc(email) {
+  const userDoc = doc(db, "users", email);
+  const userSnap = await getDoc(userDoc);
+  if (!userSnap.exists()) {
+    await setDoc(userDoc, {
+      name: email.split("@")[0],
+      photo: null,
+      friends: [],
+      friendRequests: [],
+      groups: [],
+      createdAt: serverTimestamp(),
+    });
+  }
+}
+
+async function loadUserData() {
+  if (!currentUser) return;
+  const userDoc = doc(db, "users", currentUser.email);
+  const userSnap = await getDoc(userDoc);
+  if (userSnap.exists()) {
+    currentUserData = userSnap.data();
+    profileNameInput.value = currentUserData.name || "";
+    profilePhoto.src = currentUserData.photo || "https://via.placeholder.com/100?text=Photo";
+    loadPosts();
+    loadFriends();
+    loadFriendRequests();
+    loadGroups();
+  }
+}
+
+async function saveProfileName() {
+  if (!currentUser) return;
+  const name = profileNameInput.value.trim();
+  if (!name) {
+    alert("Name cannot be empty.");
+    profileNameInput.value = currentUserData.name || "";
+    return;
+  }
+  try {
+    const userDoc = doc(db, "users", currentUser.email);
+    await updateDoc(userDoc, { name });
+    currentUserData.name = name;
+    welcomeMsg.textContent = "Welcome, " + name;
+  } catch (e) {
+    alert("Failed to save name: " + e.message);
+  }
+}
+
+async function uploadPhoto(event) {
+  if (!currentUser) return;
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = async function(e) {
+    const photoDataUrl = e.target.result;
+    try {
+      const userDoc = doc(db, "users", currentUser.email);
+      await updateDoc(userDoc, { photo: photoDataUrl });
+      currentUserData.photo = photoDataUrl;
+      profilePhoto.src = photoDataUrl;
+    } catch (e) {
+      alert("Failed to upload photo: " + e.message);
+    }
+  };
+  reader.readAsDataURL(file);
+}
+
+function startCamera() {
+  if (cameraStream) {
+    // If already streaming, take photo
+    takePhoto();
+    return;
+  }
+  navigator.mediaDevices.getUserMedia({ video: true })
+    .then(stream => {
+      cameraStream = stream;
+      cameraVideo.style.display = "block";
+      cameraVideo.srcObject = stream;
+    })
+    .catch(() => alert("Camera access denied or not available."));
+}
+
+function takePhoto() {
+  if (!cameraStream) {
+    alert("Start camera first.");
+    return;
+  }
+  const context = canvas.getContext("2d");
+  context.drawImage(cameraVideo, 0, 0, canvas.width, canvas.height);
+  const dataUrl = canvas.toDataURL("image/png");
+  cameraVideo.style.display = "none";
+  cameraStream.getTracks().forEach(track => track.stop());
+  cameraStream = null;
+  updateUserPhoto(dataUrl);
+}
+
+async function updateUserPhoto(dataUrl) {
+  if (!currentUser) return;
+  try {
+    const userDoc = doc(db, "users", currentUser.email);
+    await updateDoc(userDoc, { photo: dataUrl });
+    currentUserData.photo = dataUrl;
+    profilePhoto.src = dataUrl;
+  } catch (e) {
+    alert("Failed to update photo: " + e.message);
+  }
+}
+
+async function addPost() {
+  if (!currentUser) return;
+  const text = document.getElementById("post-text").value.trim();
+  if (!text) {
+    alert("Post cannot be empty.");
+    return;
+  }
+  try {
+    await addDoc(collection(db, "posts"), {
+      author: currentUser.email,
+      text,
+      createdAt: serverTimestamp(),
+    });
+    document.getElementById("post-text").value = "";
+  } catch (e) {
+    alert("Failed to add post: " + e.message);
+  }
+}
+
+function renderPost(post, id) {
+  const div = document.createElement("div");
+  div.className = "post-item";
+  const authorName = post.author === currentUser.email ? "You" : post.author;
+  const time = post.createdAt ? post.createdAt.toDate().toLocaleString() : "";
+  div.innerHTML = `<strong>${authorName}</strong> <em>${time}</em><p>${post.text}</p>`;
+  return div;
+}
+
+async function loadPosts() {
+  clearElement(postsList);
+  const postsQuery = query(collection(db, "posts"), orderBy("createdAt", "desc"));
+  onSnapshot(postsQuery, snapshot => {
+    clearElement(postsList);
+    snapshot.forEach(doc => {
+      postsList.appendChild(renderPost(doc.data(), doc.id));
+    });
+  });
+}
+
+async function loadFriends() {
+  clearElement(friendsList);
+  if (!currentUserData) return;
+  const friends = currentUserData.friends || [];
+  if (friends.length === 0) {
+    friendsList.textContent = "No friends yet.";
+    return;
+  }
+  for (const friendEmail of friends) {
+    const friendDoc = await getDoc(doc(db, "users", friendEmail));
+    if (!friendDoc.exists()) continue;
+    const friendData = friendDoc.data();
+    const div = document.createElement("div");
+    div.className = "friend-item";
+    div.textContent = friendData.name || friendEmail;
+    friendsList.appendChild(div);
+  }
+}
+
+async function loadFriendRequests() {
+  clearElement(requestsList);
+  if (!currentUserData) return;
+  const requests = currentUserData.friendRequests || [];
+  if (requests.length === 0) {
+    requestsList.textContent = "No friend requests.";
+    return;
+  }
+  for (const reqEmail of requests) {
+    const reqDoc = await getDoc(doc(db, "users", reqEmail));
+    if (!reqDoc.exists()) continue;
+    const reqData = reqDoc.data();
+    const div = document.createElement("div");
+    div.className = "request-item";
+    div.innerHTML = `${reqData.name || reqEmail} 
+      <button onclick="acceptRequest('${reqEmail}')">Accept</button>
+      <button onclick="rejectRequest('${reqEmail}')">Reject</button>`;
+    requestsList.appendChild(div);
+  }
+}
+
+async function acceptRequest(reqEmail) {
+  if (!currentUser) return;
+  try {
+    // Add friend to both users
+    const currentUserDoc = doc(db, "users", currentUser.email);
+    const reqUserDoc = doc(db, "users", reqEmail);
+
+    await updateDoc(currentUserDoc, {
+      friends: arrayUnion(reqEmail),
+      friendRequests: arrayRemove(reqEmail)
+    });
+
+    await updateDoc(reqUserDoc, {
+      friends: arrayUnion(currentUser.email)
+    });
+
+    // Refresh data
+    await loadUserData();
+  } catch (e) {
+    alert("Failed to accept request: " + e.message);
+  }
+}
+
+async function rejectRequest(reqEmail) {
+  if (!currentUser) return;
+  try {
+    const currentUserDoc = doc(db, "users", currentUser.email);
+    await updateDoc(currentUserDoc, {
+      friendRequests: arrayRemove(reqEmail)
+    });
+    await loadUserData();
+  } catch (e) {
+    alert("Failed to reject request: " + e.message);
+  }
+}
+
+async function createGroup() {
+  if (!currentUser) return;
+  const name = document.getElementById("new-group-name").value.trim();
+  if (!name) {
+    alert("Group name cannot be empty.");
+    return;
+  }
+  try {
+    const groupDoc = await addDoc(collection(db, "groups"), {
+      name,
+      members: [currentUser.email],
+      createdAt: serverTimestamp()
+    });
+    // Add group to user's group list
+    const userDoc = doc(db, "users", currentUser.email);
+    await updateDoc(userDoc, {
+      groups: arrayUnion(groupDoc.id)
+    });
+    document.getElementById("new-group-name").value = "";
+    await loadGroups();
+  } catch (e) {
+    alert("Failed to create group: " + e.message);
+  }
+}
+
+async function loadGroups() {
+  clearElement(groupsList);
+  clearElement(chatTargetSelect);
+  if (!currentUserData) return;
+
+  const groupIds = currentUserData.groups || [];
+  if (groupIds.length === 0) {
+    groupsList.textContent = "No groups yet.";
+    chatTargetSelect.innerHTML = "<option value=''>Select friend or group to chat</option>";
+    return;
+  }
+
+  for (const groupId of groupIds) {
+    const groupDoc = await getDoc(doc(db, "groups", groupId));
+    if (!groupDoc.exists()) continue;
+    const groupData = groupDoc.data();
+
+    // Show groups in group list
+    const div = document.createElement("div");
+    div.className = "group-item";
+    div.textContent = groupData.name;
+    groupsList.appendChild(div);
+
+    // Add to chat target select dropdown
+    const opt = document.createElement("option");
+    opt.value = "group:" + groupId;
+    opt.textContent = "Group: " + groupData.name;
+    chatTargetSelect.appendChild(opt);
+  }
+  // Also add friends as chat targets
+  for (const friendEmail of currentUserData.friends || []) {
+    const friendDoc = await getDoc(doc(db, "users", friendEmail));
+    if (!friendDoc.exists()) continue;
+    const friendData = friendDoc.data();
+    const opt = document.createElement("option");
+    opt.value = "friend:" + friendEmail;
+    opt.textContent = friendData.name || friendEmail;
+    chatTargetSelect.appendChild(opt);
+  }
+}
+
+chatTargetSelect.addEventListener("change", () => {
+  if (unsubscribeChat) unsubscribeChat();
+  currentChatTarget = chatTargetSelect.value;
+  chatMessagesDiv.innerHTML = "";
+  subscribeToChat();
+});
+
+function subscribeToChat() {
+  if (!currentUser || !currentChatTarget) return;
+  let chatQuery;
+
+  if (currentChatTarget.startsWith("friend:")) {
+    const friendEmail = currentChatTarget.slice(7);
+    // Chat between currentUser and friendEmail: collection name = chats/{chatId}/messages
+    // chatId = sorted concatenation of two emails
+    const chatId = [currentUser.email, friendEmail].sort().join("_");
+    chatQuery = query(collection(db, "chats", chatId, "messages"), orderBy("createdAt"));
+  } else if (currentChatTarget.startsWith("group:")) {
+    const groupId = currentChatTarget.slice(6);
+    chatQuery = query(collection(db, "groupChats", groupId, "messages"), orderBy("createdAt"));
+  } else {
+    return;
+  }
+
+  unsubscribeChat = onSnapshot(chatQuery, snapshot => {
+    chatMessagesDiv.innerHTML = "";
+    snapshot.forEach(doc => {
+      const msg = doc.data();
+      const div = document.createElement("div");
+      div.className = "chat-message";
+      const sender = msg.sender === currentUser.email ? "You" : msg.sender;
+      const time = msg.createdAt ? msg.createdAt.toDate().toLocaleTimeString() : "";
+      div.innerHTML = `<strong>${sender}</strong> <em>${time}</em>: ${msg.text}`;
+      chatMessagesDiv.appendChild(div);
+      chatMessagesDiv.scrollTop = chatMessagesDiv.scrollHeight;
+    });
+  });
+}
+
+async function sendMessage() {
+  if (!currentUser || !currentChatTarget) return alert("Select a friend or group to chat.");
+  const text = chatInput.value.trim();
+  if (!text) return;
+  chatInput.value = "";
+
+  try {
+    if (currentChatTarget.startsWith("friend:")) {
+      const friendEmail = currentChatTarget.slice(7);
+      const chatId = [currentUser.email, friendEmail].sort().join("_");
+      await addDoc(collection(db, "chats", chatId, "messages"), {
+        sender: currentUser.email,
+        text,
+        createdAt: serverTimestamp()
+      });
+    } else if (currentChatTarget.startsWith("group:")) {
+      const groupId = currentChatTarget.slice(6);
+      await addDoc(collection(db, "groupChats", groupId, "messages"), {
+        sender: currentUser.email,
+        text,
+        createdAt: serverTimestamp()
+      });
+    }
+  } catch (e) {
+    alert("Failed to send message: " + e.message);
+  }
+}
+
+function copyInvite() {
+  const link = document.getElementById("invite-link").value;
+  navigator.clipboard.writeText(link).then(() => {
+    alert("Invite link copied!");
+  });
+}
+
+function inviteWhatsApp() {
+  const link = encodeURIComponent(document.getElementById("invite-link").value);
+  window.open(`https://wa.me/?text=Join Arunachal Connect! ${link}`, "_blank");
+}
+
+function inviteSMS() {
+  const link = encodeURIComponent(document.getElementById("invite-link").value);
+  window.open(`sms:?&body=Join Arunachal Connect! ${link}`, "_blank");
+}
+</script>
+
+<!-- The script will continue in next message -->
+<script type="module">
+// Continue from previous script block
+
+// Function to refresh user data on Firestore changes in real-time
+function subscribeToUserDoc() {
+  if (!currentUser) return;
+  const userDocRef = doc(db, "users", currentUser.email);
+  return onSnapshot(userDocRef, docSnap => {
+    if (docSnap.exists()) {
+      currentUserData = docSnap.data();
+      // Update profile photo & name if changed externally
+      profileNameInput.value = currentUserData.name || "";
+      profilePhoto.src = currentUserData.photo || "https://via.placeholder.com/100?text=Photo";
+      welcomeMsg.textContent = "Welcome, " + (currentUserData.name || currentUser.email);
+      loadFriends();
+      loadFriendRequests();
+      loadGroups();
+    }
+  });
+}
+
+let unsubscribeUserDoc = null;
+
+// Subscribe on login
+onAuthStateChanged(auth, user => {
+  if (user) {
+    if (unsubscribeUserDoc) unsubscribeUserDoc();
+    unsubscribeUserDoc = subscribeToUserDoc();
+  } else {
+    if (unsubscribeUserDoc) unsubscribeUserDoc();
+    unsubscribeUserDoc = null;
+  }
+});
+
+// Send friend request by email (simple method)
+async function sendFriendRequest(email) {
+  if (!currentUser || !email) return alert("Please enter email to send request.");
+  if (email === currentUser.email) return alert("Cannot send request to yourself.");
+
+  try {
+    const userDocRef = doc(db, "users", email);
+    const userSnap = await getDoc(userDocRef);
+    if (!userSnap.exists()) {
+      alert("User not found.");
+      return;
+    }
+    const recipientData = userSnap.data();
+    if (recipientData.friendRequests && recipientData.friendRequests.includes(currentUser.email)) {
+      alert("Friend request already sent.");
+      return;
+    }
+    if (recipientData.friends && recipientData.friends.includes(currentUser.email)) {
+      alert("User is already your friend.");
+      return;
+    }
+
+    await updateDoc(userDocRef, {
+      friendRequests: arrayUnion(currentUser.email)
+    });
+    alert("Friend request sent!");
+  } catch (e) {
+    alert("Failed to send friend request: " + e.message);
+  }
+}
+
+// UI for sending friend request
+function createFriendRequestUI() {
+  const container = document.createElement("div");
+  container.style.marginTop = "20px";
+  container.innerHTML = `
+    <h3>Send Friend Request</h3>
+    <input type="email" id="friend-email" placeholder="Friend's Email" />
+    <button id="send-request-btn">Send Request</button>
+  `;
+  appSection.insertBefore(container, friendsList.parentElement);
+
+  document.getElementById("send-request-btn").addEventListener("click", () => {
+    const email = document.getElementById("friend-email").value.trim();
+    sendFriendRequest(email);
+  });
+}
+
+// Call this after app section loads user data
+function initAppUI() {
+  createFriendRequestUI();
+}
+
+// Initialize UI when app shows up
+authSection.style.display === "none" && initAppUI();
+
+</script>
+<script type="module">
+// Final part of the script
+
+// Call initAppUI when user logs in (after auth state changes)
+onAuthStateChanged(auth, user => {
+  if (user) {
+    initAppUI();
+  }
+});
+
+// Helpful utility function to delay for demo/testing
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+// Optional: Clear input fields on logout
+function clearInputs() {
+  document.getElementById("email").value = "";
+  document.getElementById("password").value = "";
+  document.getElementById("friend-email")?.value = "";
+  document.getElementById("post-text").value = "";
+  chatInput.value = "";
+  profileNameInput.value = "";
+}
+
+authSection.style.display === "block" && clearInputs();
+
+// On logout also clear inputs and stop camera if running
+function logout() {
+  if (unsubscribeChat) unsubscribeChat();
+  if (unsubscribeUserDoc) unsubscribeUserDoc();
+  signOut(auth);
+  currentUser = null;
+  currentUserData = null;
+  clearElement(postsList);
+  clearElement(friendsList);
+  clearElement(requestsList);
+  clearElement(groupsList);
+  clearElement(chatMessagesDiv);
+  chatTargetSelect.innerHTML = "";
+  authSection.style.display = "block";
+  appSection.style.display = "none";
+  profilePhoto.src = "https://via.placeholder.com/100?text=Photo";
+  clearInputs();
+  if (cameraStream) {
+    cameraStream.getTracks().forEach(track => track.stop());
+    cameraStream = null;
+  }
+}
+
+// Handle Enter key for login and signup inputs (optional)
+document.getElementById("email").addEventListener("keypress", e => {
+  if (e.key === "Enter") login();
+});
+document.getElementById("password").addEventListener("keypress", e => {
+  if (e.key === "Enter") login();
+});
+document.getElementById("post-text").addEventListener("keypress", e => {
+  if (e.key === "Enter" && !e.shiftKey) {
+    e.preventDefault();
+    addPost();
+  }
+});
+chatInput.addEventListener("keypress", e => {
+  if (e.key === "Enter") {
+    e.preventDefault();
+    sendMessage();
+  }
+});
+
+</script>
+
+</body>
+</html>
