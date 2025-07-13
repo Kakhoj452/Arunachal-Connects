@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>MyFacebook</title>
+  <link rel="manifest" href="manifest.json" />
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: Arial, sans-serif; background-color: #f0f2f5; }
+    .navbar {
+      background-color: #1877f2;
+      color: white;
+      padding: 10px 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .container { display: flex; padding: 20px; }
+    .sidebar { width: 25%; padding: 10px; }
+    .main { width: 50%; padding: 10px; }
+    .post-box, .post, .friends {
+      background-color: white;
+      padding: 15px;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .post-box { margin-bottom: 20px; }
+    .post-box textarea {
+      width: 100%; height: 60px; resize: none;
+      padding: 10px; border-radius: 5px; border: 1px solid #ccc;
+    }
+    .post-box button {
+      margin-top: 10px; padding: 8px 16px;
+      background-color: #1877f2; color: white;
+      border: none; border-radius: 5px; cursor: pointer;
+    }
+    .post { margin-bottom: 15px; }
+    .friend { margin-bottom: 10px; }
+    #auth-container {
+      display: flex; flex-direction: column;
+      max-width: 300px; margin: 100px auto; padding: 20px;
+      background-color: white; border-radius: 10px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+    }
+    #auth-container input, #auth-container button {
+      margin-top: 10px; padding: 10px; font-size: 16px;
+    }
+    #mainApp { display: none; }
+    @media (max-width: 768px) {
+      .container { flex-direction: column; }
+      .sidebar, .main { width: 100%; }
+    }
+  </style>
+</head>
+<body>
+
+  <div id="auth-container">
+    <h2>MyFacebook</h2>
+    <input type="text" id="username" placeholder="Enter your name" />
+    <input type="password" id="password" placeholder="Password" />
+    <button onclick="signup()">Sign Up</button>
+    <button onclick="login()">Log In</button>
+    <p id="auth-message" style="color:red; margin-top:10px;"></p>
+  </div>
+
+  <div id="mainApp">
+    <div class="navbar">
+      <h1>MyFacebook</h1>
+      <p id="welcomeName">Welcome!</p>
+    </div>
+
+    <div class="container">
+      <div class="sidebar">
+        <div class="friends">
+          <h3>Friends</h3>
+          <div class="friend">John</div>
+          <div class="friend">Lisa</div>
+          <div class="friend">Mark</div>
+        </div>
+      </div>
+
+      <div class="main">
+        <div class="post-box">
+          <textarea id="postInput" placeholder="What's on your mind?"></textarea>
+          <button onclick="addPost()">Post</button>
+        </div>
+        <div id="postsContainer"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let posts = [];
+    let currentUser = null;
+
+    function signup() {
+      const name = document.getElementById('username').value.trim();
+      const pass = document.getElementById('password').value;
+      if (!name || !pass) return showMessage("Please enter name and password.");
+      let users = JSON.parse(localStorage.getItem("users") || "{}");
+      if (users[name]) return showMessage("User already exists.");
+      users[name] = { password: pass };
+      localStorage.setItem("users", JSON.stringify(users));
+      showMessage("Signup successful! Now log in.");
+    }
+
+    function login() {
+      const name = document.getElementById('username').value.trim();
+      const pass = document.getElementById('password').value;
+      let users = JSON.parse(localStorage.getItem("users") || "{}");
+      if (!users[name] || users[name].password !== pass) return showMessage("Invalid credentials.");
+      currentUser = name;
+      localStorage.setItem("loggedInUser", name);
+      launchApp();
+    }
+
+    function showMessage(msg) {
+      document.getElementById('auth-message').innerText = msg;
+    }
+
+    function launchApp() {
+      document.getElementById('auth-container').style.display = 'none';
+      document.getElementById('mainApp').style.display = 'block';
+      document.getElementById('welcomeName').innerText = `Welcome, ${currentUser}!`;
+      loadPosts();
+    }
+
+    function addPost() {
+      const input = document.getElementById('postInput');
+      const text = input.value.trim();
+      if (!text) return;
+      const postData = { user: currentUser, text };
+      posts.push(postData);
+      savePosts();
+      renderPost(postData, true);
+      input.value = '';
+    }
+
+    function renderPost(post, prepend = false) {
+      const div = document.createElement('div');
+      div.className = 'post';
+      div.innerHTML = `<p><strong>${post.user}</strong></p><p>${post.text}</p>`;
+      const container = document.getElementById('postsContainer');
+      prepend ? container.prepend(div) : container.appendChild(div);
+    }
+
+    function loadPosts() {
+      const saved = localStorage.getItem("posts");
+      posts = saved ? JSON.parse(saved) : [];
+      posts.slice().reverse().forEach(p => renderPost(p));
+    }
+
+    function savePosts() {
+      localStorage.setItem("posts", JSON.stringify(posts));
+    }
+
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('service-worker.js').then(() => {
+        console.log("Service Worker registered");
+      });
+    }
+
+    window.onload = () => {
+      const savedUser = localStorage.getItem("loggedInUser");
+      if (savedUser) {
+        currentUser = savedUser;
+        launchApp();
+      }
+    };
+  </script>
+
+</body>
+</html>
