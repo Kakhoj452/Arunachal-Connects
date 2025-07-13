@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Arunachal Connect</title>
+  <script type="module">
+    // Firebase setup
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+    import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+    import { getFirestore, collection, doc, setDoc, getDocs, query, where, getDoc, updateDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyA5A-DFo6MKDLT3T4mVBe-MJ6LRRTOTyK0",
+      authDomain: "arunachal-connect.firebaseapp.com",
+      projectId: "arunachal-connect",
+      storageBucket: "arunachal-connect.appspot.com",
+      messagingSenderId: "560048361030",
+      appId: "1:560048361030:web:91dc33e39a5919f069c447"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+
+    let currentUserEmail = null;
+
+    async function register() {
+      const name = document.getElementById('reg-name').value;
+      const phone = document.getElementById('reg-phone').value;
+      const email = document.getElementById('reg-email').value;
+      const pass = document.getElementById('reg-pass').value;
+
+      try {
+        const userCredential = await createUserWithEmailAndPassword(auth, email, pass);
+        await setDoc(doc(db, "users", email), {
+          name, phone, email, friends: [], requests: []
+        });
+        alert("Registration successful. Please log in.");
+      } catch (error) {
+        alert("Error: " + error.message);
+      }
+    }
+
+    async function login() {
+      const email = document.getElementById('log-email').value;
+      const pass = document.getElementById('log-pass').value;
+
+      try {
+        await signInWithEmailAndPassword(auth, email, pass);
+        currentUserEmail = email;
+        document.getElementById('auth').style.display = 'none';
+        document.getElementById('app').style.display = 'block';
+        document.getElementById('welcome').innerText = "Welcome, " + email;
+        loadUsers();
+        loadFriendRequests();
+      } catch (error) {
+        alert("Login failed: " + error.message);
+      }
+    }
+
+    async function logout() {
+      await signOut(auth);
+      document.getElementById('auth').style.display = 'block';
+      document.getElementById('app').style.display = 'none';
+    }
+
+    async function loadUsers() {
+      const search = document.getElementById('search').value.toLowerCase();
+      const usersCol = collection(db, "users");
+      const usersSnap = await getDocs(usersCol);
+      const list = document.getElementById('results');
+      list.innerHTML = "";
+      usersSnap.forEach(docu => {
+        const data = docu.data();
+        if (data.email !== currentUserEmail &&
+            (data.name.toLowerCase().includes(search) || data.phone.includes(search))) {
+          const div = document.createElement('div');
+          div.innerHTML = `${data.name} (${data.phone}) <button onclick="sendRequest('${data.email}')">Add Friend</button>`;
+          list.appendChild(div);
+        }
+      });
+    }
+
+    async function sendRequest(toEmail) {
+      const userRef = doc(db, "users", toEmail);
+      const userSnap = await getDoc(userRef);
+      if (userSnap.exists()) {
+        const data = userSnap.data();
+        if (!data.requests.includes(currentUserEmail)) {
+          data.requests.push(currentUserEmail);
+          await updateDoc(userRef, { requests: data.requests });
+          alert("Friend request sent!");
+        } else {
+          alert("Request already sent.");
+        }
+      }
+    }
+
+    async function loadFriendRequests() {
+      const userRef = doc(db, "users", currentUserEmail);
+      const userSnap = await getDoc(userRef);
+      const data = userSnap.data();
+      const list = document.getElementById('requests');
+      list.innerHTML = "<h4>Friend Requests</h4>";
+      for (const req of data.requests) {
+        const item = document.createElement('div');
+        item.innerHTML = `${req} <button onclick="acceptRequest('${req}')">Accept</button>`;
+        list.appendChild(item);
+      }
+    }
+
+    async function acceptRequest(fromEmail) {
+      const myRef = doc(db, "users", currentUserEmail);
+      const theirRef = doc(db, "users", fromEmail);
+
+      const mySnap = await getDoc(myRef);
+      const theirSnap = await getDoc(theirRef);
+
+      const myData = mySnap.data();
+      const theirData = theirSnap.data();
+
+      // Remove from requests
+      myData.requests = myData.requests.filter(e => e !== fromEmail);
+      myData.friends.push(fromEmail);
+      theirData.friends.push(currentUserEmail);
+
+      await updateDoc(myRef, { requests: myData.requests, friends: myData.friends });
+      await updateDoc(theirRef, { friends: theirData.friends });
+
+      alert("Friend added!");
+      loadFriendRequests();
+    }
+
+    window.register = register;
+    window.login = login;
+    window.logout = logout;
+    window.loadUsers = loadUsers;
+    window.sendRequest = sendRequest;
+    window.acceptRequest = acceptRequest;
+  </script>
+</head>
+<body>
+  <div id="auth">
+    <h2>Arunachal Connect</h2>
+    <h3>Register</h3>
+    <input id="reg-name" placeholder="Name"><br>
+    <input id="reg-phone" placeholder="Phone"><br>
+    <input id="reg-email" placeholder="Email"><br>
+    <input id="reg-pass" type="password" placeholder="Password"><br>
+    <button onclick="register()">Sign Up</button>
+
+    <h3>Login</h3>
+    <input id="log-email" placeholder="Email"><br>
+    <input id="log-pass" type="password" placeholder="Password"><br>
+    <button onclick="login()">Log In</button>
+  </div>
+
+  <div id="app" style="display:none;">
+    <div style="background:#1877f2; color:white; padding:10px;">
+      <span id="welcome"></span>
+      <button onclick="logout()" style="float:right;">Logout</button>
+    </div>
+
+    <div style="padding:20px;">
+      <h3>Search Users</h3>
+      <input id="search" placeholder="Name or Phone">
+      <button onclick="loadUsers()">Search</button>
+      <div id="results"></div>
+
+      <div id="requests" style="margin-top:30px;"></div>
+    </div>
+  </div>
+</body>
+</html>
