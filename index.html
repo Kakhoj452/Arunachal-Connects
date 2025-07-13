@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Arunachal Connect</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f0f2f5;
+      margin: 0;
+      padding: 0;
+    }
+    .header {
+      background: #1877f2;
+      color: white;
+      padding: 15px;
+      text-align: center;
+      font-size: 24px;
+    }
+    .container {
+      max-width: 600px;
+      margin: 30px auto;
+      background: white;
+      padding: 20px;
+      border-radius: 10px;
+      box-shadow: 0 0 10px #ccc;
+    }
+    input, textarea {
+      width: 100%;
+      padding: 10px;
+      margin-top: 10px;
+      border-radius: 5px;
+      border: 1px solid #ccc;
+      box-sizing: border-box;
+      font-size: 16px;
+    }
+    button {
+      padding: 10px;
+      margin-top: 10px;
+      width: 100%;
+      background-color: #1877f2;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      font-size: 16px;
+      cursor: pointer;
+    }
+    button:hover {
+      background-color: #145dbf;
+    }
+    .profile-img {
+      width: 80px;
+      height: 80px;
+      border-radius: 50%;
+      object-fit: cover;
+      border: 2px solid #1877f2;
+      display: block;
+      margin-top: 10px;
+    }
+    .invite-buttons button {
+      width: 32%;
+      margin-right: 2%;
+      font-size: 14px;
+    }
+  </style>
+</head>
+<body>
+
+<div class="header">Arunachal Connect</div>
+
+<div class="container" id="auth-section">
+  <h2>Login or Sign Up</h2>
+  <input type="text" id="email" placeholder="Email" />
+  <input type="password" id="password" placeholder="Password" />
+  <button onclick="login()">Login</button>
+  <button onclick="signup()">Sign Up</button>
+</div>
+
+<div class="container" id="app-section" style="display:none;">
+  <h2 id="welcome-msg">Welcome</h2>
+  <button onclick="logout()">Logout</button>
+
+  <h3>Profile Photo</h3>
+  <input type="file" id="photo-input" onchange="uploadPhoto(event)" />
+  <button onclick="takePhoto()">📷 Take Picture</button>
+  <video id="camera" width="100%" autoplay style="display:none;"></video>
+  <canvas id="canvas" width="320" height="240" style="display:none;"></canvas>
+  <img id="profile-photo" class="profile-img" src="" alt="Profile Photo" />
+
+  <h3>Invite Friends</h3>
+  <input type="text" value="https://kakhoj452.github.io/myfacebook/" id="invite-link" readonly />
+  <div class="invite-buttons">
+    <button onclick="copyInvite()">Copy Link</button>
+    <button onclick="inviteWhatsApp()">WhatsApp</button>
+    <button onclick="inviteSMS()">SMS</button>
+  </div>
+<script type="module">
+// Firebase setup
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import {
+  getAuth,
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+  onAuthStateChanged,
+  signOut
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyA5A-DFo6MKDLT3T4mVBe-MJ6LRRTOTyK0",
+  authDomain: "arunachal-connect.firebaseapp.com",
+  projectId: "arunachal-connect",
+  storageBucket: "arunachal-connect.appspot.com",
+  messagingSenderId: "560048361030",
+  appId: "1:560048361030:web:91dc33e39a5919f069c447"
+};
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+
+const authSection = document.getElementById("auth-section");
+const appSection = document.getElementById("app-section");
+const welcomeMsg = document.getElementById("welcome-msg");
+
+const photoInput = document.getElementById("photo-input");
+const profilePhoto = document.getElementById("profile-photo");
+
+let currentEmail = null;
+
+onAuthStateChanged(auth, (user) => {
+  if (user) {
+    currentEmail = user.email;
+    authSection.style.display = "none";
+    appSection.style.display = "block";
+    welcomeMsg.textContent = "Welcome, " + currentEmail;
+    loadPhoto();
+  } else {
+    authSection.style.display = "block";
+    appSection.style.display = "none";
+    currentEmail = null;
+  }
+});
+
+function signup() {
+  const email = document.getElementById("email").value;
+  const pass = document.getElementById("password").value;
+  createUserWithEmailAndPassword(auth, email, pass)
+    .then(() => alert("Signup success! Now login."))
+    .catch(err => alert("Signup Error: " + err.message));
+}
+
+function login() {
+  const email = document.getElementById("email").value;
+  const pass = document.getElementById("password").value;
+  signInWithEmailAndPassword(auth, email, pass)
+    .catch(err => alert("Login Error: " + err.message));
+}
+
+function logout() {
+  signOut(auth);
+}
+
+// Save profile photo to localStorage
+function uploadPhoto(e) {
+  const file = e.target.files[0];
+  const reader = new FileReader();
+  reader.onload = function(event) {
+    const imgData = event.target.result;
+    localStorage.setItem("photo_" + currentEmail, imgData);
+    profilePhoto.src = imgData;
+  };
+  if (file) reader.readAsDataURL(file);
+}
+
+// Load photo
+function loadPhoto() {
+  const imgData = localStorage.getItem("photo_" + currentEmail);
+  if (imgData) {
+    profilePhoto.src = imgData;
+  } else {
+    profilePhoto.src = "https://via.placeholder.com/80?text=Photo";
+  }
+}
+
+// Camera
+function takePhoto() {
+  const video = document.getElementById("camera");
+  const canvas = document.getElementById("canvas");
+
+  navigator.mediaDevices.getUserMedia({ video: true }).then(stream => {
+    video.style.display = "block";
+    video.srcObject = stream;
+
+    setTimeout(() => {
+      const context = canvas.getContext("2d");
+      context.drawImage(video, 0, 0, canvas.width, canvas.height);
+      const imgData = canvas.toDataURL("image/png");
+      localStorage.setItem("photo_" + currentEmail, imgData);
+      profilePhoto.src = imgData;
+
+      // Stop camera
+      stream.getTracks().forEach(track => track.stop());
+      video.style.display = "none";
+    }, 3000); // Take picture after 3 sec
+  });
+}
+
+// Invite
+function copyInvite() {
+  const input = document.getElementById("invite-link");
+  input.select();
+  document.execCommand("copy");
+  alert("Link copied!");
+}
+
+function inviteWhatsApp() {
+  const msg = "Join me on Arunachal Connect! https://kakhoj452.github.io/myfacebook/";
+  window.open("https://wa.me/?text=" + encodeURIComponent(msg));
+}
+
+function inviteSMS() {
+  const msg = "Join me on Arunachal Connect: https://kakhoj452.github.io/myfacebook/";
+  window.open("sms:?body=" + encodeURIComponent(msg));
+}
+</script>
+
+</body>
+</html>
