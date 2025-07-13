@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Arunachal Connect</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 0;
+      background: #f0f2f5;
+    }
+    .header {
+      background: #1877f2;
+      color: white;
+      padding: 15px;
+      text-align: center;
+      font-size: 24px;
+    }
+    .container {
+      max-width: 600px;
+      margin: 30px auto;
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 0 10px #ccc;
+    }
+    h3 {
+      margin-top: 0;
+    }
+    input, textarea {
+      width: 100%;
+      padding: 10px;
+      margin: 8px 0;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      box-sizing: border-box;
+      font-size: 16px;
+    }
+    button {
+      padding: 10px 20px;
+      margin: 10px 0 20px 0;
+      cursor: pointer;
+      border: none;
+      border-radius: 4px;
+      background-color: #1877f2;
+      color: white;
+      font-size: 16px;
+    }
+    button:hover {
+      background-color: #145dbf;
+    }
+    .toggle-buttons {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+    .toggle-buttons button {
+      background-color: #eee;
+      color: #333;
+      margin: 0 10px;
+      padding: 8px 16px;
+      border-radius: 20px;
+      font-weight: bold;
+    }
+    .toggle-buttons button.active {
+      background-color: #1877f2;
+      color: white;
+    }
+    #app {
+      display: none;
+    }
+    img.profile {
+      width: 80px;
+      height: 80px;
+      border-radius: 50%;
+      object-fit: cover;
+      margin-top: 10px;
+      border: 2px solid #1877f2;
+    }
+    .section {
+      margin-top: 25px;
+    }
+    #post-feed div {
+      border-bottom: 1px solid #ddd;
+      padding: 8px 0;
+    }
+    #post-feed div b {
+      font-size: 12px;
+      color: #666;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="header">Arunachal Connect</div>
+
+  <div class="container" id="auth-container">
+    <div class="toggle-buttons">
+      <button id="show-signup" class="active">Sign Up</button>
+      <button id="show-login">Log In</button>
+    </div>
+
+    <div id="signup-form">
+      <h3>Create Account</h3>
+      <input id="reg-name" placeholder="Name" />
+      <input id="reg-phone" placeholder="Phone" />
+      <input id="reg-email" placeholder="Email" />
+      <input id="reg-pass" type="password" placeholder="Password" />
+      <button onclick="register()">Sign Up</button>
+    </div>
+
+    <div id="login-form" style="display:none;">
+      <h3>Log In</h3>
+      <input id="log-email" placeholder="Email" />
+      <input id="log-pass" type="password" placeholder="Password" />
+      <button onclick="login()">Log In</button>
+    </div>
+  </div>
+
+  <div class="container" id="app">
+    <div style="text-align:right"><button onclick="logout()">Logout</button></div>
+    <h3 id="welcome"></h3>
+
+    <div class="section">
+      <h4>Profile Photo</h4>
+      <input type="file" onchange="uploadPhoto(event)" />
+      <br />
+      <img id="profile-pic" class="profile" src="" alt="Profile Picture" />
+    </div>
+
+    <div class="section">
+      <h4>Post Something</h4>
+      <textarea id="post-text" placeholder="What's on your mind?"></textarea>
+      <button onclick="addPost()">Post</button>
+      <div id="post-feed"></div>
+    </div>
+
+    <div class="section">
+      <h4>Friends</h4>
+      <div id="friends-list"></div>
+    </div>
+
+    <div class="section">
+      <h4>Search Users</h4>
+      <input id="search" placeholder="Name or Phone" />
+      <button onclick="loadUsers()">Search</button>
+      <div id="results"></div>
+    </div>
+
+    <div class="section">
+      <h4>Friend Requests</h4>
+      <div id="requests"></div>
+    </div>
+
+    <div class="section">
+      <h4>Invite a Friend</h4>
+      <input type="text" value="https://kakhoj452.github.io/myfacebook/" readonly />
+      <button onclick="copyInvite()">Copy Link</button>
+    </div>
+  </div>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+    import {
+      getAuth,
+      createUserWithEmailAndPassword,
+      signInWithEmailAndPassword,
+      signOut,
+      onAuthStateChanged,
+    } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+    import {
+      getFirestore,
+      collection,
+      doc,
+      setDoc,
+      getDocs,
+      getDoc,
+      updateDoc,
+    } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyA5A-DFo6MKDLT3T4mVBe-MJ6LRRTOTyK0",
+      authDomain: "arunachal-connect.firebaseapp.com",
+      projectId: "arunachal-connect",
+      storageBucket: "arunachal-connect.appspot.com",
+      messagingSenderId: "560048361030",
+      appId: "1:560048361030:web:91dc33e39a5919f069c447",
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+
+    let currentEmail = null;
+
+    // Toggle forms UI
+    const showSignupBtn = document.getElementById("show-signup");
+    const showLoginBtn = document.getElementById("show-login");
+    const signupForm = document.getElementById("signup-form");
+    const loginForm = document.getElementById("login-form");
+    const authContainer = document.getElementById("auth-container");
+    const appContainer = document.getElementById("app");
+
+    showSignupBtn.addEventListener("click", () => {
+      signupForm.style.display = "block";
+      loginForm.style.display = "none";
+      showSignupBtn.classList.add("active");
+      showLoginBtn.classList.remove("active");
+    });
+
+    showLoginBtn.addEventListener("click", () => {
+      signupForm.style.display = "none";
+      loginForm.style.display = "block";
+      showLoginBtn.classList.add("active");
+      showSignupBtn.classList.remove("active");
+    });
+
+    async function register() {
+      try {
+        const name = document.getElementById("reg-name").value.trim();
+        const phone = document.getElementById("reg-phone").value.trim();
+        const email = document.getElementById("reg-email").value.trim();
+        const pass = document.getElementById("reg-pass").value;
+
+        if (!name || !phone || !email || !pass) {
+          alert("Please fill all fields.");
+          return;
+        }
+
+        await createUserWithEmailAndPassword(auth, email, pass);
+        await setDoc(doc(db, "users", email), {
+          name,
+          phone,
+          email,
+          friends: [],
+          requests: [],
+        });
+
+        alert("Registered successfully! Please log in.");
+        // Switch to login form automatically
+        showLoginBtn.click();
+
+        // Clear signup inputs
+        document.getElementById("reg-name").value = "";
+        document.getElementById("reg-phone").value = "";
+        document.getElementById("reg-email").value = "";
+        document.getElementById("reg-pass").value = "";
+      } catch (err) {
+        alert("Error: " + err.message);
+      }
+    }
+
+    async function login() {
+      try {
+        const email = document.getElementById("log-email").value.trim();
+        const pass = document.getElementById("log-pass").value;
+
+        if (!email || !pass) {
+          alert("Please enter email and password.");
+          return;
+        }
+
+        await signInWithEmailAndPassword(auth, email, pass);
+        currentEmail = email;
+
+        authContainer.style.display = "none";
+        appContainer.style.display = "block";
+
+        document.getElementById("welcome").innerText = "Welcome, " + email;
+
+        loadPhoto();
+        loadPosts();
+        loadFriendRequests();
+        loadFriends();
+      } catch (err) {
+        alert("Login failed: " + err.message);
+      }
+    }
+
+    async function logout() {
+      await signOut(auth);
+      currentEmail = null;
+      authContainer.style.display = "block";
+      appContainer.style.display = "none";
+    }
+
+    function uploadPhoto(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        localStorage.setItem(currentEmail + "_photo", reader.result);
+        loadPhoto();
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function loadPhoto() {
+      const pic = localStorage.getItem(currentEmail + "_photo");
+      document.getElementById("profile-pic").src = pic || "";
+    }
+
+    function addPost() {
+      const text = document.getElementById("post-text").value.trim();
+      if (!text) return;
+      const posts = JSON.parse(localStorage.getItem(currentEmail + "_posts") || "[]");
+      posts.unshift({ text, time: new Date().toLocaleString() });
+      localStorage.setItem(currentEmail + "_posts", JSON.stringify(posts));
+      document.getElementById("post-text").value = "";
+      loadPosts();
+    }
+
+    function loadPosts() {
+      const posts = JSON.parse(localStorage.getItem(currentEmail + "_posts") || "[]");
+      const feed = document.getElementById("post-feed");
+      feed.innerHTML = "";
+      posts.forEach((p) => {
+        const div = document.createElement("div");
+        div.innerHTML = `<b>${p.time}</b><br>${p.text}<hr>`;
+        feed.appendChild(div);
+      });
+    }
+
+    async function loadUsers() {
+      const search = document.getElementById("search").value.toLowerCase();
+      const snap = await getDocs(collection(db, "users"));
+      const results = document.getElementById("results");
+      results.innerHTML = "";
+      snap.forEach((docu) => {
+        const data = docu.data();
+        if (
+          data.email !== currentEmail &&
+          (data.name.toLowerCase().includes(search) || data.phone.includes(search))
+        ) {
+          const div = document.createElement("div");
+          div.innerHTML = `${data.name} (${data.phone}) <button onclick="sendRequest('${data.email}')">Add Friend</button>`;
+          results.appendChild(div);
+        }
+      });
+    }
+
+    async function sendRequest(toEmail) {
+      const toRef = doc(db, "users", toEmail);
+      const toData = (await getDoc(toRef)).data();
+      if (!toData.requests.includes(currentEmail)) {
+        toData.requests.push(currentEmail);
+        await updateDoc(toRef, { requests: toData.requests });
+        alert("Friend request sent");
+      }
+    }
+
+    async function loadFriendRequests() {
+      const userRef = doc(db, "users", currentEmail);
+      const data = (await getDoc(userRef)).data();
+      const list = document.getElementById("requests");
+      list.innerHTML = "";
+      for (let req of data.requests) {
+        const item = document.createElement("div");
+        item.innerHTML = `${req} <button onclick="acceptRequest('${req}')">Accept</button>`;
+        list.appendChild(item);
+      }
+    }
+
+    async function acceptRequest(fromEmail) {
+      const meRef = doc(db, "users", currentEmail);
+      const themRef = doc(db, "users", fromEmail);
+      const me = (await getDoc(meRef)).data();
+      const them = (await getDoc(themRef)).data();
+
+      me.requests = me.requests.filter((e) => e !== fromEmail);
+      me.friends.push(fromEmail);
+      them.friends.push(currentEmail);
+
+      await updateDoc(meRef, { requests: me.requests, friends: me.friends });
+      await updateDoc(themRef, { friends: them.friends });
+      loadFriendRequests();
+      loadFriends();
+    }
+
+    async function loadFriends() {
+      const me = (await getDoc(doc(db, "users", currentEmail))).data();
+      const list = document.getElementById("friends-list");
+      list.innerHTML = "";
+      for (let email of me.friends) {
+        const friend = (await getDoc(doc(db, "users", email))).data();
+        const div = document.createElement("div");
+        div.textContent = friend.name + " (" + friend.phone + ")";
+        list.appendChild(div);
+      }
+    }
+
+    function copyInvite() {
+      navigator.clipboard.writeText("https://kakhoj452.github.io/myfacebook/");
+      alert("Invite link copied!");
+    }
+
+    // Keep user logged in on page reload
+    onAuthStateChanged(auth, (user) => {
+      if (user) {
+        currentEmail = user.email;
+        authContainer.style.display = "none";
+        appContainer.style.display = "block";
+        document.getElementById("welcome").innerText = "Welcome, " + currentEmail;
+        loadPhoto();
+        loadPosts();
+        loadFriendRequests();
+        loadFriends();
+      } else {
+        currentEmail = null;
+        authContainer.style.display = "block";
+        appContainer.style.display = "none";
+      }
+    });
+
+    window.register = register;
+    window.login = login;
+    window.logout = logout;
+    window.loadUsers = loadUsers;
+    window.sendRequest = sendRequest;
+    window.acceptRequest = acceptRequest;
+    window.copyInvite = copyInvite;
+    window.uploadPhoto = uploadPhoto;
+    window.addPost = addPost;
+  </script>
+</body>
+</html>
