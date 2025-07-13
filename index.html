@@ -67,7 +67,13 @@
   <div id="mainApp">
     <div class="navbar">
       <h1>Arunachal connect</h1>
-      <p id="welcomeName">Welcome!</p>
+      <div style="display:flex; align-items:center; gap:10px;">
+  <img id="profilePhoto" src="" width="40" height="40" style="border-radius:50%; object-fit:cover;" />
+  <p id="welcomeName">Welcome!</p>
+  <input type="file" id="photoInput" accept="image/*" style="display:none;" onchange="uploadPhoto(event)" />
+  <button onclick="document.getElementById('photoInput').click()">Edit Photo</button>
+</div>
+
     </div>
 
     <div class="container">
@@ -165,9 +171,31 @@
       const savedUser = localStorage.getItem("loggedInUser");
       if (savedUser) {
         currentUser = savedUser;
-        launchApp();
+        launchApp()document.getElementById('welcomeName').innerText = `Welcome, ${currentUser}!`;loadProfilePhoto();
+
+;
       }
     };
+    function uploadPhoto(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    localStorage.setItem(`photo_${currentUser}`, e.target.result);
+    document.getElementById('profilePhoto').src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+function loadProfilePhoto() {
+  const savedPhoto = localStorage.getItem(`photo_${currentUser}`);
+  if (savedPhoto) {
+    document.getElementById('profilePhoto').src = savedPhoto;
+  } else {
+    document.getElementById('profilePhoto').src = "https://via.placeholder.com/40?text=👤";
+  }
+}
+    
   </script>
 
 </body>
