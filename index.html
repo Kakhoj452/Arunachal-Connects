@@ -65,6 +65,7 @@
     }
 
     async function loadUsers() {
+      console.log("Search button clicked");
       const search = document.getElementById('search').value.toLowerCase();
       const usersCol = collection(db, "users");
       const usersSnap = await getDocs(usersCol);
